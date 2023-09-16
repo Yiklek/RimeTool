@@ -158,7 +158,8 @@ fn load_config() -> ToolConfig {
         })
         .and_then(|p| fs::read_to_string(p).ok())
         .unwrap_or_default();
-    toml::from_str(&config_str).expect("parse config toml failed.")
+    toml::from_str(&config_str)
+        .unwrap_or_else(|e| panic!("Failed to parse config: {}", e.message()))
 }
 
 fn rime_redeploy() {
@@ -224,37 +225,32 @@ fn toggle_service(checked: bool) {
     }
 }
 
-fn main() {
-    init_log();
-    let s = System::new_all();
+macro_rules! panic_if_err {
+    ($result:expr) => {
+        $result.unwrap_or_else(|e| panic!("{:#?}", e))
+    };
+    ($result:expr, $msg:literal) => {
+        $result.unwrap_or_else(|e| panic!($msg, e))
+    };
+}
 
-    let e = env::current_exe()
-        .ok()
-        .and_then(|p| {
-            p.file_name()
-                .and_then(|f| f.to_str())
-                .map(|f| String::from(f))
-        })
-        .unwrap_or(format!(env!("CARGO_PKG_NAME")));
-
-    let ps = s.processes_by_name(&e);
-    if ps.count() > 1 {
-        warn!("{} is already running. exit.", e);
-        std::process::exit(0);
-    }
-    info!("start...");
-
+fn start() {
     let icon = ICON_BYTES;
+
     let event_loop = EventLoopBuilder::<TrayUserEvent>::with_user_event().build();
 
     let tray_menu = Menu::new();
 
     let icon_about = load_icon(icon);
     let icon_exe = icon_about.clone();
-    let icon_about =
-        MIcon::from_rgba(icon_about.rgba, icon_about.width, icon_about.height).expect("Fail icon");
-    let icon_exe =
-        Icon::from_rgba(icon_exe.rgba, icon_exe.width, icon_exe.height).expect("Fail icon");
+    let icon_about = panic_if_err!(
+        MIcon::from_rgba(icon_about.rgba, icon_about.width, icon_about.height),
+        "Failed to load icon. {}"
+    );
+    let icon_exe = panic_if_err!(
+        Icon::from_rgba(icon_exe.rgba, icon_exe.width, icon_exe.height),
+        "Failed to load icon. {}"
+    );
 
     let service = CheckMenuItem::new("算法服务", true, true, None);
     let redeploy = MenuItem::new("重新部署", true, None);
@@ -279,15 +275,14 @@ fn main() {
         &quit,
     ]);
 
-    let mut tray_icon = Some(
-        TrayIconBuilder::new()
-            .with_menu(Box::new(tray_menu))
-            .with_tooltip(NAME)
-            .with_icon(icon_exe)
-            .with_menu_on_left_click(true)
-            .build()
-            .expect("Build TrayIcon Failed."),
-    );
+    let mut tray_icon = TrayIconBuilder::new()
+        .with_menu(Box::new(tray_menu))
+        .with_tooltip(NAME)
+        .with_icon(icon_exe)
+        .with_menu_on_left_click(true)
+        .build()
+        .ok();
+
     let quit_id = quit.id().clone();
     let redeploy_id = redeploy.id().clone();
     let service_id = service.id().clone();
@@ -342,11 +337,34 @@ fn main() {
         }
     })
 }
+fn main() {
+    init_log();
+    let s = System::new_all();
+
+    let e = env::current_exe()
+        .ok()
+        .and_then(|p| {
+            p.file_name()
+                .and_then(|f| f.to_str())
+                .map(|f| String::from(f))
+        })
+        .unwrap_or(format!(env!("CARGO_PKG_NAME")));
+
+    let ps = s.processes_by_name(&e);
+    if ps.count() > 1 {
+        warn!("{} is already running. exit.", e);
+        std::process::exit(0);
+    }
+    std::panic::set_hook(Box::new(|i| {
+        error!("{}", i);
+    }));
+    info!("start.");
+    start();
+}
 
 fn load_icon(icon: &[u8]) -> RgbaIcon {
-    let image = image::load_from_memory(icon)
-        .expect("Failed to open icon path")
-        .into_rgba8();
+    let image =
+        panic_if_err!(image::load_from_memory(icon), "Faild to load icon: {:?}").into_rgba8();
     let (width, height) = image.dimensions();
     let rgba = image.into_raw();
     RgbaIcon {
