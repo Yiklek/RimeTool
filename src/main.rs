@@ -109,11 +109,11 @@ fn init_log() {
             )))
             .target(Target::Stderr)
             .build();
-        let log_path = env::temp_dir().join("rime-tool.log");
+        let log_path = env::temp_dir().join(format!("{}.log", env!("CARGO_PKG_NAME")));
 
         let window_size = 5;
         let fixed_window_roller = FixedWindowRoller::builder()
-            .build(&(log_path.to_string_lossy() + ".{}.log"), window_size)
+            .build( &format!("{}.{{}}.log", log_path.to_string_lossy()), window_size)
             .unwrap();
         let size_limit = 5 * 1024 * 1024; // 5MB as max log file size to roll
         let size_trigger = SizeTrigger::new(size_limit);
@@ -234,7 +234,7 @@ fn main() {
                 .and_then(|f| f.to_str())
                 .map(|f| String::from(f))
         })
-        .unwrap_or_default();
+        .unwrap_or(format!(env!("CARGO_PKG_NAME")));
 
     let ps = s.processes_by_name(&e);
     if ps.count() > 1 {
