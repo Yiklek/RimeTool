@@ -265,9 +265,13 @@ fn main() {
         &PredefinedMenuItem::about(
             Some("关于"),
             Some(AboutMetadata {
-                name: Some("Rime 工具".to_string()),
-                copyright: Some("Copyright Yiklek.".to_string()),
+                name: Some(format!("Rime 工具")),
+                copyright: Some(format!(
+                    "Copyright Yiklek. {}",
+                    env!("CARGO_PKG_REPOSITORY")
+                )),
                 icon: Some(icon_about),
+                version: Some(format!(env!("CARGO_PKG_VERSION"))),
                 ..Default::default()
             }),
         ),
