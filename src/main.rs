@@ -37,7 +37,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use sysinfo::{ProcessExt, System, SystemExt};
+use sysinfo::{ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tao::event_loop::{ControlFlow, DeviceEventFilter, EventLoopBuilder};
 use toml;
 use tray_icon::{
@@ -203,14 +203,18 @@ fn rime_start_service() {
     });
 }
 fn rime_stop_service() {
-    let s = System::new_all();
+    let s = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+    );
     let ps = s.processes_by_name("WeaselServer.exe");
     for p in ps {
         p.kill();
     }
 }
 fn get_service_status() -> bool {
-    let s = System::new_all();
+    let s = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+    );
     let ps = s.processes_by_name("WeaselServer.exe");
     ps.count() > 0
 }
@@ -339,8 +343,9 @@ fn start() {
 }
 fn main() {
     init_log();
-    let s = System::new_all();
-
+    let s = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+    );
     let e = env::current_exe()
         .ok()
         .and_then(|p| {
