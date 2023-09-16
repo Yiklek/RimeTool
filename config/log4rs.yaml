@@ -1,0 +1,22 @@
+appenders:
+  stdout:
+    kind: console
+    filters:
+      - kind: threshold
+        level: debug
+  logfile:
+    kind: rolling_file
+    path: tmp/log/rime-tool.log
+    policy:
+      trigger:
+        kind: size
+        limit: 5 mb
+      roller:
+        kind: fixed_window
+        pattern: tmp/log/rime-tool.log.{}.log
+        count: 5
+root:
+  level: trace
+  appenders:
+    - stdout
+    - logfile

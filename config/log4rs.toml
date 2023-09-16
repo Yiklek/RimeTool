@@ -1,0 +1,17 @@
+[appenders.stdout]
+kind = "console"
+filters = [{ kind = "threshold", level = "debug" }]
+encoder = { pattern = "{d(%Y-%m-%d %H:%M:%S %Z)} {M}:{f}:{L} {l} {T} {t} - {m}{n}" }
+
+[appenders.logfile]
+kind = "rolling_file"
+path = "tmp/log/rime-tool.log"
+encoder = { pattern = "{d(%Y-%m-%d %H:%M:%S %Z)} {M}:{f}:{L} {l} {T} {t} - {m}{n}" }
+
+[appenders.logfile.policy]
+trigger = { kind = "size", limit = "5 mb" }
+roller = { kind = "fixed_window", pattern = "tmp/log/rime-tool.log.{}.log", count = 5 }
+
+[root]
+level = "trace"
+appenders = ["stdout", "logfile"]
