@@ -113,7 +113,10 @@ fn init_log() {
 
         let window_size = 5;
         let fixed_window_roller = FixedWindowRoller::builder()
-            .build( &format!("{}.{{}}.log", log_path.to_string_lossy()), window_size)
+            .build(
+                &format!("{}.{{}}.log", log_path.to_string_lossy()),
+                window_size,
+            )
             .unwrap();
         let size_limit = 5 * 1024 * 1024; // 5MB as max log file size to roll
         let size_trigger = SizeTrigger::new(size_limit);
