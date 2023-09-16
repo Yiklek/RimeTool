@@ -39,7 +39,7 @@ use std::{
     process::Command,
 };
 use sysinfo::{ProcessExt, System, SystemExt};
-use tao::event_loop::{ControlFlow, EventLoopBuilder};
+use tao::event_loop::{ControlFlow, DeviceEventFilter, EventLoopBuilder};
 use toml;
 use tray_icon::{
     menu::{
@@ -319,6 +319,8 @@ fn main() {
         }
         proxy.send_event(TrayUserEvent::IconClicked);
     }));
+    // filter all device event, maybe change to unfocused, if add another feature.
+    event_loop.set_device_event_filter(DeviceEventFilter::Always);
     event_loop.run(move |event, _, control_flow| {
         use tao::event::Event::NewEvents;
         use tao::event::Event::UserEvent;
