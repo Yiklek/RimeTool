@@ -1,5 +1,4 @@
 #![allow(unused)]
-// #![feature(lazy_cell)]
 #![windows_subsystem = "windows"]
 
 use log::{debug, error, info, trace, warn, LevelFilter};
@@ -69,18 +68,19 @@ struct ToolConfig {
     root: String,
 }
 
+const NAME: &str = "Rime 工具箱";
+const ICON_BYTES: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.png"));
+static CONFIG: Lazy<ToolConfig> = Lazy::new(|| load_config());
+
 #[cfg(target_os = "windows")]
 fn default_rime_root() -> String {
-    use registry::{Hive, Security};
-    let default = "C:/Program Files (x86)/Rime/weasel-0.15.0";
-    let r = Hive::LocalMachine
+    use registry::{key::Error, Hive, RegKey, Security};
+    Hive::LocalMachine
         .open(r"SOFTWARE\WOW6432Node\Rime\Weasel", Security::Read)
-        .or_else(|_| Err(default))
-        .and_then(|key| key.value("WeaselRoot").or_else(|_| Err(default)));
-    match r {
-        Ok(key) => key.to_string(),
-        Err(e) => e.to_string(),
-    }
+        .ok()
+        .and_then(|key| key.value("WeaselRoot").ok())
+        .map(|v| v.to_string())
+        .unwrap_or(String::from("C:/Program Files (x86)/Rime/weasel-0.15.0"))
 }
 
 #[cfg(target_os = "linux")]
@@ -90,8 +90,6 @@ fn default_rime_root() -> String {
 
 use once_cell::sync::Lazy;
 
-const ICON_BYTES: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.png"));
-static CONFIG: Lazy<ToolConfig> = Lazy::new(|| load_config());
 fn init_log_from_file() -> bool {
     let log_config_paths = vec!["config/log4rs.toml", "config/log4rs.yaml"];
     log_config_paths
@@ -268,7 +266,7 @@ fn main() {
         &PredefinedMenuItem::about(
             Some("关于"),
             Some(AboutMetadata {
-                name: Some(format!("Rime 工具")),
+                name: Some(format!("{}", NAME)),
                 copyright: Some(format!(
                     "Copyright Yiklek. {}",
                     env!("CARGO_PKG_REPOSITORY")
@@ -284,7 +282,7 @@ fn main() {
     let mut tray_icon = Some(
         TrayIconBuilder::new()
             .with_menu(Box::new(tray_menu))
-            .with_tooltip("Rime 工具")
+            .with_tooltip(NAME)
             .with_icon(icon_exe)
             .with_menu_on_left_click(true)
             .build()
