@@ -24,11 +24,10 @@ use log4rs::{
     Config,
 };
 use serde::Deserialize;
-use serde_yaml;
-use std::fs;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
+    net::SocketAddr,
     sync::{Arc, Mutex},
     thread,
 };
@@ -37,7 +36,8 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use sysinfo::{ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
+use std::{ffi::OsStr, fs};
+use sysinfo::{Process, ProcessRefreshKind, RefreshKind, System};
 use tao::event_loop::{ControlFlow, DeviceEventFilter, EventLoopBuilder};
 use toml;
 use tray_icon::{
@@ -127,7 +127,11 @@ fn init_log() {
             .build(log_path, Box::new(compound_policy))
             .unwrap();
         let config = Config::builder()
-            .appender(Appender::builder().build("logfile", Box::new(logfile)))
+            .appender(
+                Appender::builder()
+                    .filter(Box::new(ThresholdFilter::new(LevelFilter::Trace)))
+                    .build("logfile", Box::new(logfile)),
+            )
             .appender(
                 Appender::builder()
                     .filter(Box::new(ThresholdFilter::new(LevelFilter::Debug)))
@@ -206,7 +210,7 @@ fn rime_stop_service() {
     let s = System::new_with_specifics(
         RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
     );
-    let ps = s.processes_by_name("WeaselServer.exe");
+    let ps = s.processes_by_name(OsStr::new("WeaselServer.exe"));
     for p in ps {
         p.kill();
     }
@@ -215,7 +219,7 @@ fn get_service_status() -> bool {
     let s = System::new_with_specifics(
         RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
     );
-    let ps = s.processes_by_name("WeaselServer.exe");
+    let ps = s.processes_by_name(OsStr::new("WeaselServer.exe"));
     ps.count() > 0
 }
 fn update_service_status(service_item: &CheckMenuItem) {
@@ -237,7 +241,54 @@ macro_rules! panic_if_err {
         $result.unwrap_or_else(|e| panic!($msg, e))
     };
 }
+fn create_tray() -> (Option<TrayIcon>, Option<CheckMenuItem>) {
+    let icon = ICON_BYTES;
+    let tray_menu = Menu::new();
 
+    let icon_about = load_icon(icon);
+    let icon_exe = icon_about.clone();
+    let icon_about = panic_if_err!(
+        MIcon::from_rgba(icon_about.rgba, icon_about.width, icon_about.height),
+        "Failed to load icon. {}"
+    );
+    let icon_exe = panic_if_err!(
+        Icon::from_rgba(icon_exe.rgba, icon_exe.width, icon_exe.height),
+        "Failed to load icon. {}"
+    );
+
+    let service = CheckMenuItem::new("算法服务", true, true, None);
+    let redeploy = MenuItem::new("重新部署", true, None);
+    let quit = MenuItem::new("退出", true, None);
+    tray_menu.append_items(&[
+        &service,
+        &redeploy,
+        &PredefinedMenuItem::separator(),
+        &PredefinedMenuItem::about(
+            Some("关于"),
+            Some(AboutMetadata {
+                name: Some(format!("{}", NAME)),
+                copyright: Some(format!(
+                    "Copyright Yiklek. {}",
+                    env!("CARGO_PKG_REPOSITORY")
+                )),
+                icon: Some(icon_about),
+                version: Some(format!(env!("CARGO_PKG_VERSION"))),
+                ..Default::default()
+            }),
+        ),
+        &quit,
+    ]);
+
+    let mut tray_icon = TrayIconBuilder::new()
+        .with_menu(Box::new(tray_menu))
+        .with_tooltip(NAME)
+        .with_icon(icon_exe)
+        .with_menu_on_left_click(true)
+        .build()
+        .ok();
+
+    (tray_icon, Some(service))
+}
 fn start() {
     let icon = ICON_BYTES;
 
@@ -307,23 +358,34 @@ fn start() {
     }));
 
     let proxy = event_loop.create_proxy();
-    let service_ptr = &service as *const CheckMenuItem as usize;
     TrayIconEvent::set_event_handler(Some(move |e| {
         trace!("tray {e:?}");
-
-        unsafe {
-            update_service_status(&*(service_ptr as *const CheckMenuItem));
+        match e {
+            TrayIconEvent::Click {
+                id,
+                position,
+                rect,
+                button,
+                button_state,
+            } => {
+                debug!("tray clicked {button:?}");
+                proxy.send_event(TrayUserEvent::IconClicked);
+            }
+            _ => (),
         }
-        proxy.send_event(TrayUserEvent::IconClicked);
     }));
+
     // filter all device event, maybe change to unfocused, if add another feature.
     event_loop.set_device_event_filter(DeviceEventFilter::Always);
     event_loop.run(move |event, _, control_flow| {
         use tao::event::Event::NewEvents;
         use tao::event::Event::UserEvent;
 
-        *control_flow = ControlFlow::Wait;
-        // trace!("loop {event:?}");
+        *control_flow = ControlFlow::WaitUntil(
+            std::time::Instant::now() + std::time::Duration::from_millis(16),
+        );
+        trace!("loop {event:?}");
+
         match event {
             UserEvent(TrayUserEvent::Quit) => {
                 debug!("quit.");
@@ -355,7 +417,7 @@ fn main() {
         })
         .unwrap_or(format!(env!("CARGO_PKG_NAME")));
 
-    let ps = s.processes_by_name(&e);
+    let ps = s.processes_by_name(OsStr::new(&e));
     if ps.count() > 1 {
         warn!("{} is already running. exit.", e);
         std::process::exit(0);
