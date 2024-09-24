@@ -16,7 +16,7 @@ serde = "~1"
 sysinfo = "~0.31"
 tao = "~0.29"
 toml = "~0.8"
-tray-icon = "~0.15"
+tray-icon = "~0.18"
 
 [target.'cfg(windows)'.dependencies]
 registry = "~1.2"
