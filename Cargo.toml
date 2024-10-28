@@ -19,7 +19,7 @@ toml = "~0.8"
 tray-icon = "~0.19"
 
 [target.'cfg(windows)'.dependencies]
-registry = "~1.2"
+registry = "~1.3"
 
 
 [target.'cfg(windows)'.build-dependencies]
