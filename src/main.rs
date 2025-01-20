@@ -228,7 +228,6 @@ fn rime_stop_service() {
 fn get_service_status() -> bool {
     let s = System::new_with_specifics(
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
-
     );
     let ps = s.processes_by_name(OsStr::new("WeaselServer.exe"));
     ps.count() > 0
@@ -385,7 +384,6 @@ fn main() {
     init_log();
     let s = System::new_with_specifics(
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
-
     );
     let e = env::current_exe()
         .anyhow()
