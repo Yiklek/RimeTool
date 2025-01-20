@@ -22,6 +22,7 @@ use log4rs::{
     Config,
 };
 use serde::Deserialize;
+use std::sync::LazyLock;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
@@ -76,7 +77,7 @@ impl Default for ToolConfig {
 
 const NAME: &str = "Rime 工具箱";
 const ICON_BYTES: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/icon.png"));
-static CONFIG: Lazy<ToolConfig> = Lazy::new(|| load_config());
+static CONFIG: LazyLock<ToolConfig> = LazyLock::new(|| load_config());
 
 #[cfg(target_os = "windows")]
 fn default_rime_root() -> String {
@@ -96,8 +97,6 @@ fn default_rime_root() -> String {
 fn default_rime_root() -> String {
     "/usr/local".to_string()
 }
-
-use once_cell::sync::Lazy;
 
 fn init_log_from_file() -> bool {
     let log_config_paths = vec!["config/log4rs.toml", "config/log4rs.yaml"];
